@@ -30,7 +30,7 @@ def data_read(file_name, var_name, timesteps):
     print(lon.shape, lat.shape, XC.shape, YC.shape) 
     return total_rows, total_cols, timesteps, data, lon, lat, XC, YC
 
-def domain_data(total_rows, total_cols, timesteps, data, lon, lat, XC, YC):
+def domain_info_1D(total_rows, total_cols, timesteps, data, lon, lat, XC, YC):
     total_gridcells = total_rows * total_cols
     grid_ids = np.linspace(0, total_gridcells-1, total_gridcells, dtype=int)
     grid_ids = grid_ids.reshape(total_cols,total_rows)
@@ -62,7 +62,7 @@ def domain_data(total_rows, total_cols, timesteps, data, lon, lat, XC, YC):
     """
     # Create a boolean mask where True indicates non-NaN values
     bool_mask = ~np.isnan(data[0])
-
+    #land_mask = np.where(~np.isnan(data[0]), 1, 0)
     # Apply the mask to the data data array
     grid_ids = grid_ids[bool_mask]
     lon = lon[bool_mask]
@@ -70,8 +70,10 @@ def domain_data(total_rows, total_cols, timesteps, data, lon, lat, XC, YC):
     XC = XC[bool_mask]
     YC = YC[bool_mask]
 
-    print("domain info" + str(lon.shape) + str(lat.shape) + str(XC.shape) + str(YC.shape) )
-    return grid_ids, data, lon, lat, XC, YC
+    print("domain info" + str(lon.shape) + str(lat.shape) + str(XC.shape) \
+            + str(YC.shape) + str(bool_mask.shape) + str(grid_ids.shape))
+    return grid_ids, data, lon, lat, XC, YC, bool_mask
+
 
 def data_partition_RR(number_of_subdomains, grid_ids, data):
     # cyclic (round-robin) partition
@@ -180,7 +182,7 @@ def data_save_1dNA(output_path, grid_ids, i_timesteps, var_name, period, data, l
     w_nc_fid.close()  # close the new file        
 
 
-def data_save_1dNA_domain(output_path, grid_ids, data, lon, lat, XC, YC):
+def domain_save_1dNA(output_path, grid_ids, data, lon, lat, XC, YC):
     # convert local grid_id_lists into an array
     grid_id_arr = np.array(grid_ids)
 
@@ -204,46 +206,128 @@ def data_save_1dNA_domain(output_path, grid_ids, data, lon, lat, XC, YC):
     x_dim = w_nc_fid.createDimension('x_dim', 7814)
     y_dim = w_nc_fid.createDimension('y_dim', 8075)   
 
-    w_nc_var = w_nc_fid.createVariable('gridIDs', np.int32, ('ni',))
+    w_nc_var = w_nc_fid.createVariable('gridIDs', np.int32, ('nj','ni'))
     w_nc_var.long_name = 'gridIds in the NA domain'
     w_nc_var.decription = "start from #0 at the upper left corner of the domain, covering all land and ocean gridcells" 
     w_nc_fid.variables['gridIDs'][:] = grid_id_arr.reshape(grid_id_arr.size)
 
-    w_nc_var = w_nc_fid.createVariable('lon', np.float32, ('ni',))
+    w_nc_var = w_nc_fid.createVariable('xc', np.float32, ('nj','ni'))
     w_nc_var.long_name = 'longitude of land gridcell center (GCS_WGS_84), increasing from west to east'
     w_nc_var.units = "degrees_east"
     #w_nc_var.bounds = "xv" ;    
-    w_nc_fid.variables['lon'][:] = lon
+    w_nc_fid.variables['xc'][:] = lon
         
-    w_nc_var = w_nc_fid.createVariable('lat', np.float32, ('ni',))
+    w_nc_var = w_nc_fid.createVariable('yc', np.float32, ('nj','ni'))
     w_nc_var.long_name = 'latitude of land gridcell center (GCS_WGS_84), decreasing from north to south'
     w_nc_var.units = "degrees_north"        
-    w_nc_fid.variables['lat'][:] = lat
+    w_nc_fid.variables['yc'][:] = lat
         
     # create the XC, YC variable
-    w_nc_var = w_nc_fid.createVariable('xc', np.float32, ('ni',))
+    w_nc_var = w_nc_fid.createVariable('xc_LLC', np.float32, ('nj','ni'))
     w_nc_var.long_name = 'X of land gridcell center (Lambert Conformal Conic), increasing from west to east'
     w_nc_var.units = "m"
     #w_nc_var.bounds = "xv" ;    
-    w_nc_fid.variables['xc'][:] = XC
+    w_nc_fid.variables['xc_LLC'][:] = XC
         
-    w_nc_var = w_nc_fid.createVariable('yc', np.float32, ('ni',))
+    w_nc_var = w_nc_fid.createVariable('yc_LLC', np.float32, ('nj','ni'))
     w_nc_var.long_name = 'Y of land gridcell center (Lambert Conformal Conic), decreasing from north to south'
     w_nc_var.units = "m"        
-    w_nc_fid.variables['yc'][:] = YC
+    w_nc_fid.variables['yc_LLC'][:] = YC
 
-    w_nc_var = w_nc_fid.createVariable('area', np.float32, ('ni',))
+    w_nc_var = w_nc_fid.createVariable('area', np.float32, ('nj','ni'))
     w_nc_var.long_name = 'Area of land gridcells (Lambert Conformal Conic)'
     w_nc_var.coordinate = 'xc yc' 
     w_nc_var.units = "km2"        
     w_nc_fid.variables['area'][:] = area
 
-    w_nc_var = w_nc_fid.createVariable('mask', np.int32, ('ni',))
+    w_nc_var = w_nc_fid.createVariable('mask', np.int32, ('nj','ni'))
     w_nc_var.long_name = 'mask of land gridcells (1 means land)'
     w_nc_var.units = "unitless"        
     w_nc_fid.variables['mask'][:] = mask  
 
-    w_nc_var = w_nc_fid.createVariable('landfrac', np.float32, ('ni',))
+    w_nc_var = w_nc_fid.createVariable('landfrac', np.float32, ('nj','ni'))
+    w_nc_var.long_name = 'fraction of land gridcell that is active'
+    w_nc_var.coordinate = 'xc yc' 
+    w_nc_var.units = "unitless" ;        
+    w_nc_fid.variables['landfrac'][:] = landfrac  
+
+    w_nc_var = w_nc_fid.createVariable('lambert_conformal_conic', np.short)
+    w_nc_var.grid_mapping_name = "lambert_conformal_conic"
+    w_nc_var.longitude_of_central_meridian = -100. 
+    w_nc_var.latitude_of_projection_origin = 42.5         
+    w_nc_var.false_easting = 0. 
+    w_nc_var.false_northing = 0.
+    w_nc_var.standard_parallel = 25., 60.          
+    w_nc_var.semi_major_axis = 6378137.
+    w_nc_var.inverse_flattening = 298.257223563
+
+    w_nc_fid.close()  # close the new file  
+
+
+def domain_save_2dNA(output_path, total_rows, total_cols, data, lon, lat, XC, YC):
+
+    # add the gridcell IDs.
+    total_gridcells = total_rows * total_cols
+    grid_ids = np.linspace(0, total_gridcells-1, total_gridcells, dtype=int)
+    grid_ids = grid_ids.reshape(total_cols,total_rows)
+
+    #create land gridcell mask, area, and landfrac (otherwise 0)
+    mask = np.where(~np.isnan(data[0]), 1, 0)
+    area = mask.astype(float)
+    landfrac = area 
+
+    file_name = output_path + 'Daymet4.1km.2d.domain.nc'
+    print("The 2D domain file is " + file_name)
+
+    # Open a new NetCDF file to write the domain information. For format, you can choose from
+    # 'NETCDF3_CLASSIC', 'NETCDF3_64BIT', 'NETCDF4_CLASSIC', and 'NETCDF4'
+    w_nc_fid = nc.Dataset(file_name, 'w', format='NETCDF4')
+    w_nc_fid.title = '2D domain file for the Daymet NA region'
+
+    # create the gridIDs, lon, and lat variable
+    x_dim = w_nc_fid.createDimension('x_dim', 7814)
+    y_dim = w_nc_fid.createDimension('y_dim', 8075)   
+
+    w_nc_var = w_nc_fid.createVariable('gridIDs', np.int32, ('y_dim','x_dim'))
+    w_nc_var.long_name = 'gridIds in the NA domain'
+    w_nc_var.decription = "start from #0 at the upper left corner of the domain, covering all land and ocean gridcells" 
+    w_nc_fid.variables['gridIDs'][:] = grid_ids 
+
+    w_nc_var = w_nc_fid.createVariable('xc', np.float32, ('y_dim','x_dim'))
+    w_nc_var.long_name = 'longitude of land gridcell center (GCS_WGS_84), increasing from west to east'
+    w_nc_var.units = "degrees_east"
+    #w_nc_var.bounds = "xv" ;    
+    w_nc_fid.variables['xc'][:] = lon
+        
+    w_nc_var = w_nc_fid.createVariable('yc', np.float32, ('y_dim','x_dim'))
+    w_nc_var.long_name = 'latitude of land gridcell center (GCS_WGS_84), decreasing from north to south'
+    w_nc_var.units = "degrees_north"        
+    w_nc_fid.variables['yc'][:] = lat
+        
+    # create the XC, YC variable
+    w_nc_var = w_nc_fid.createVariable('xc_LLC', np.float32, ('y_dim','x_dim'))
+    w_nc_var.long_name = 'X of land gridcell center (Lambert Conformal Conic), increasing from west to east'
+    w_nc_var.units = "m"
+    #w_nc_var.bounds = "xv" ;    
+    w_nc_fid.variables['xc_LLC'][:] = XC
+        
+    w_nc_var = w_nc_fid.createVariable('yc_LLC', np.float32, ('y_dim','x_dim'))
+    w_nc_var.long_name = 'Y of land gridcell center (Lambert Conformal Conic), decreasing from north to south'
+    w_nc_var.units = "m"        
+    w_nc_fid.variables['yc_LLC'][:] = YC
+
+    w_nc_var = w_nc_fid.createVariable('area', np.float32, ('y_dim','x_dim'))
+    w_nc_var.long_name = 'Area of land gridcells (Lambert Conformal Conic)'
+    w_nc_var.coordinate = 'xc yc' 
+    w_nc_var.units = "km2"        
+    w_nc_fid.variables['area'][:] = area
+
+    w_nc_var = w_nc_fid.createVariable('mask', np.int32, ('y_dim','x_dim'))
+    w_nc_var.long_name = 'mask of land gridcells (1 means land)'
+    w_nc_var.units = "unitless"        
+    w_nc_fid.variables['mask'][:] = mask  
+
+    w_nc_var = w_nc_fid.createVariable('landfrac', np.float32, ('y_dim','x_dim'))
     w_nc_var.long_name = 'fraction of land gridcell that is active'
     w_nc_var.coordinate = 'xc yc' 
     w_nc_var.units = "unitless" ;        
@@ -276,11 +360,16 @@ def launch_job(input_path, file_name, output_path, var_name, period, \
     [total_rows, total_cols, i_timesteps, data, lon, lat, XC, YC] = data_read(file_name, var_name, i_timesteps)
     end = process_time()
     print("Reading " + file_name + " takes  {}".format(end-start))
+
+    start = process_time()
+    domain_save_2dNA(output_path, total_rows, total_cols, data, lon, lat, XC, YC)
+    end = process_time()
+    print("Saving 2D domain data takes {}".format(end-start))
     
     start = process_time()  
-    [grid_ids, data, lon, lat, XC, YC] = domain_data(total_rows, total_cols, i_timesteps, data, lon, lat, XC, YC)
+    [grid_ids, data, lon, lat, XC, YC, land_mask] = domain_info_1D(total_rows, total_cols, i_timesteps, data, lon, lat, XC, YC)
     end = process_time()
-    print("Creating domain data takes  {}".format(end-start))
+    print("Creating 1D domain data takes  {}".format(end-start))
 
     """
     start = process_time()
@@ -293,9 +382,9 @@ def launch_job(input_path, file_name, output_path, var_name, period, \
     #data_save(number_of_subdomains, grid_id_domains, output_path, i_timesteps, \
     #          var_name, period, data)
     #data_save_1dNA(output_path, grid_ids, i_timesteps, var_name, period, data, lon, lat)
-    data_save_1dNA_domain(output_path, grid_ids, data, lon, lat, XC, YC)
+    domain_save_1dNA(output_path, grid_ids, data, lon, lat, XC, YC)
     end = process_time()
-    print("Saving domain data takes {}".format(end-start))
+    print("Saving 1D domain data takes {}".format(end-start))
     
 def get_files(input_path):
     print(input_path)
