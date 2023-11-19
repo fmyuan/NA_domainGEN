@@ -229,7 +229,7 @@ def domain_save_1dNA(output_path, grid_ids, data, lon, lat, XC, YC):
     #w_nc_var.bounds = "xv" ;    
     w_nc_fid.variables['xc_LCC'][:] = XC
         
-    w_nc_var = w_nc_fid.createVariable('yc_LLC', np.float32, ('nj','ni'))
+    w_nc_var = w_nc_fid.createVariable('yc_LCC', np.float32, ('nj','ni'))
     w_nc_var.long_name = 'Y of land gridcell center (Lambert Conformal Conic), decreasing from north to south'
     w_nc_var.units = "m"        
     w_nc_fid.variables['yc_LCC'][:] = YC
@@ -309,12 +309,12 @@ def domain_save_2dNA(output_path, total_rows, total_cols, data, lon, lat, XC, YC
     w_nc_var.long_name = 'X of land gridcell center (Lambert Conformal Conic), increasing from west to east'
     w_nc_var.units = "m"
     #w_nc_var.bounds = "xv" ;    
-    w_nc_fid.variables['xc_LLC'][:] = XC
+    w_nc_fid.variables['xc_LCC'][:] = XC
         
     w_nc_var = w_nc_fid.createVariable('yc_LCC', np.float32, ('y_dim','x_dim'))
     w_nc_var.long_name = 'Y of land gridcell center (Lambert Conformal Conic), decreasing from north to south'
     w_nc_var.units = "m"        
-    w_nc_fid.variables['yc_LLC'][:] = YC
+    w_nc_fid.variables['yc_LCC'][:] = YC
 
     w_nc_var = w_nc_fid.createVariable('area', np.float32, ('y_dim','x_dim'))
     w_nc_var.long_name = 'Area of land gridcells (Lambert Conformal Conic)'
