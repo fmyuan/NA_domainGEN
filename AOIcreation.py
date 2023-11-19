@@ -33,53 +33,82 @@ def main():
 
     # save to the 1D domain file
     AOIdomain = str(AOI)+'domain.nc'
+
+    # check if file exists then delete it
+    if os.path.exists(AOIdomain):
+        os.remove(AOIdomain)
+
+    source_file = 'Daymet4.1km.1d.domain.nc'
     dst = nc.Dataset(AOIdomain, 'w', format='NETCDF4')
 
     # open the 1D domain data
-    r_domain = nc.Dataset('Daymet4.1km.1d.domain.nc', 'r', format='NETCDF4')
+    src = nc.Dataset(source_file, 'r', format='NETCDF4')
+    # read yc_llc, xc_llc (y, x in LLC)
+    NA_yc_LCC = src.variables['yc_LCC'][:]
+    NA_xc_LCC = src.variables['xc_LCC'][:]
 
     # 3) Open a csv file to read a list of points (y, x)
     #df = read_gridcells(AOI_gridcell_file)  
 
     if user_option == '1': # gridID is used directly
-
-        df = pd.read_csv(AOI_gridcell_file, sep=" ", skiprows=1, names = ['gridIDs'])
+        AOI_gridcell_file = 'AKSPgridIDs.csv'  # user provided gridcell IDs
+        df = pd.read_csv(AOI_gridcell_file, sep=",", skiprows=1, names = ['gridID'])
         #read gridIds
-        AOI_points = list(df['gridIDs'])
+        AOI_points = list(df['gridID'])
+        #AOI_points = list(mygridIDs)
 
         # read gridIDs
-        NA_gridIds = r_domain.variables['gridIDs'][:]
+        NA_gridIDs = src.variables['gridID'][:]
         NA_gridcell_list = list(NA_gridIDs)
         print(NA_gridcell_list[0:5])
 
+        domain_idx = np.where(np.in1d(NA_gridcell_list, AOI_points))[0]
+
     if user_option == '2': # use lat lon coordinates
-        df = pd.read_csv(AOI_gridcell_file, sep=" ", skiprows=1, names = ['yc', 'xc', 'yc_LLC', 'xc_LLC'])
-        # read yc, xc (lat, lon)
-        NA_yc = r_domain.variables['yc'][:]
-        NA_xc = r_domain.variables['xc'][:]
+        AOI_gridcell_file = 'AKSP_xcyc.csv'  # user provided gridcell csv file  (xc, yc) (lon, lat)
+        df = pd.read_csv(AOI_gridcell_file, sep=",", skiprows=1, names = ['xc', 'yc'], engine='python')
 
-        #read in y, x coordinate (lat, lon)
-        AOI_points = list(zip(df['yc'], df['xc']))
+        #read in x, y coordinate (lon, lat)
+        AOI_points = list(zip(df['xc'], df['yc']))
+        #AOI_points = list(zip(myxc, myyc))
+        
         # create list for all land gridcell (lat, lon)
-        NA_gridcell_list = list(zip(NA_yc, NA_xc))
-        print(NA_gridcell_list[0:5])
+        NA_gridcell_list = list(zip(NA_xc, NA_yc))
 
-    if user_option == '3': # gridID is used directly
+        AOI_points_arr = np.array(AOI_points)
+        print("AOI_points_arr", AOI_points_arr[0:5], "shape", AOI_points_arr.shape)
+        NA_gridcell_arr = np.squeeze(np.array(NA_gridcell_list)).transpose()    
+        print("NA_gridcell_arr", NA_gridcell_arr[0:5], "shape", NA_gridcell_arr.shape)
 
-        df = pd.read_csv(AOI_gridcell_file, sep=" ", skiprows=1, names = ['yc', 'xc', 'yc_LLC', 'xc_LLC'])
-        # read yc_llc, xc_llc (y, x in LLC)
-        NA_yc_LLC = r_domain.variables['yc_LLC'][:]
-        NA_xc_LLC = r_domain.variables['xc_LLC'][:]
+        tree = cKDTree(NA_gridcell_arr)
+        _, domain_idx = tree.query(AOI_points_arr, k=1)
 
-        #read in y, x coordinate (in LLC projection)
-        AOI_points = list(zip(df['yc_LLC'], df['xc_LLC']))
+    if user_option == '3': # xc_LLC and yc_LLC is used directly
+        AOI_gridcell_file = 'AKSP_XYLLC.csv'  # user provided gridcell csv file  (xc_LLC, yc_LLC) 
+        df = pd.read_csv(AOI_gridcell_file, sep=",", skiprows=1, names = ['xc_LLC', 'yc_LLC'], engine='python')
+
+        #read in x, y coordinate (in LLC projection)
+        AOI_points = list(zip(df['xc_LLC'], df['yc_LLC']))
+        #AOI_points = list(zip(myxc_lcc, myyc_lcc))
         # create list for all land gridcell (lat, lon)
-        NA_gridcell_list = list(zip(NA_yc_LLC, NA_xc_LLC))
-        print(NA_gridcell_list[0:5])
-    
+        NA_gridcell_list = list(zip(NA_xc_LLC, NA_yc_LLC))
+
+        AOI_points_arr = np.array(AOI_points)
+        print("AOI_points_arr", AOI_points_arr[0:5], "shape", AOI_points_arr.shape)
+        NA_gridcell_arr = np.squeeze(np.array(NA_gridcell_list)).transpose()    
+        print("NA_gridcell_arr", NA_gridcell_arr[0:5], "shape", NA_gridcell_arr.shape)
+
     #Find the nearest points in the 1D list of points and return the index of these nearest points
-    NA_domain_idx = find_nearest_points(AOI_points, NA_gridcell_list)
-    print(NA_domain_idx[0:10])
+    #landcells = NA_yc.shape[1]
+    #NA_gridcell_arr = np.array(NA_gridcell_list).reshape(2, landcells).transpose()  #array (n,m) n data points of m dimensions
+    #AOI_points_arr = np.array(AOI_points).transpose()
+
+        tree = cKDTree(NA_gridcell_arr)
+        _, domain_idx = tree.query(AOI_points_arr, k=1)
+
+    domain_idx = np.sort(domain_idx).squeeze()
+    print("gridID_idx", domain_idx[0:10])
+    np.savetxt("AOIgridId_idx.csv", domain_idx[0:100], delimiter=",", fmt='%d')
 
     # Copy the global attributes from the source to the target
     for name in src.ncattrs():
@@ -87,30 +116,33 @@ def main():
 
     # Copy the dimensions from the source to the target
     for name, dimension in src.dimensions.items():
-        dst.createDimension(
-            name, (len(dimension) if not dimension.isunlimited() else None))
+        if name != 'ni':
+            dst.createDimension(
+                name, (len(dimension) if not dimension.isunlimited() else None))
+        else:
+            # Update the 'ni' dimension with the length of the list
+            #dst.dimensions['ni'].set_length(len(AOI_points))
+            ni = dst.createDimension("ni", len(AOI_points))
 
     # Copy the variables from the source to the target
     for name, variable in src.variables.items():
-        x = dst.createVariable(name, variable.datatype, variable.dimensions)
-        dst[name][:] = src[name][:]
-
+        x = dst.createVariable(name, variable.datatype, variable.dimensions)   
+        print(name, variable.dimensions)
+        
+        if (name != 'lambert_conformal_conic'):
+            if (variable.dimensions[-1] != 'ni'):
+                dst[name][:] = src[name][:]
+            else:
+                dst[name][:] = src[name][0][domain_idx]
+           
         # Copy the variable attributes
         for attr_name in variable.ncattrs():
             dst[name].setncattr(attr_name, variable.getncattr(attr_name))
 
-    # Update the 'ni' dimension with the length of the list
-    dst.dimensions['ni'].set_length(len(AOI_points))
-
-    # Sort the points
-    AOI_points.sort()
-
-    # Use the points as index to copy all the elements in each variable
-    for name in src.variables:
-        dst[name][:] = src[name][AOI_points]
-    
+    dst.title = '1D domain for '+ AOI +', generated on ' +formatted_date + ' with ' + source_file
+       
     # Close the source netCDF file
-    r_domain.close()
+    src.close()
 
     # Save the target netCDF file
     dst.close()
