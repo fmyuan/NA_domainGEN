@@ -1,6 +1,6 @@
 
-# data_partition module for batch processing
-# based on array_split and function definition
+# utility to generate 1D and 2D domain
+# use previous dataPartition module. Code need to be clean up
 
 import os 
 import netCDF4 as nc
@@ -157,25 +157,27 @@ def data_save_1dNA(output_path, grid_ids, i_timesteps, var_name, period, data, l
     # Open a new NetCDF file to write the data to. For format, you can choose from
     # 'NETCDF3_CLASSIC', 'NETCDF3_64BIT', 'NETCDF4_CLASSIC', and 'NETCDF4'
     w_nc_fid = nc.Dataset(file_name, 'w', format='NETCDF4')
-    w_nc_fid.title = 'forcing : '+ var_name + 'in the NA domain'
+    w_nc_fid.title = var_name + '('+period+') in the NA domain'
 
     # create the gridIDs, lon, and lat variable
-    x_dim = w_nc_fid.createDimension('x_dim', grid_id_arr.size)
+    gridcell_dim = w_nc_fid.createDimension('gridcell', grid_id_arr.size)
     time_dim = w_nc_fid.createDimension('time_dim', i_timesteps)
-    w_nc_var = w_nc_fid.createVariable('gridID', np.int32, ('x_dim',))
-    w_nc_var.long_name = 'gridIds in the NA domain'    
-    w_nc_fid.variables['gridIDs'][:] = grid_id_arr.reshape(grid_id_arr.size)
-
-    w_nc_var = w_nc_fid.createVariable('lon', np.int32, ('x_dim',))
+    w_nc_var = w_nc_fid.createVariable('gridID', np.int32, ('gridcell_dim',))
+    w_nc_var.long_name = 'gridId in the NA domain'    
+    w_nc_fid.variables['gridID'][:] = grid_id_arr.reshape(grid_id_arr.size)
+    
+    """ 
+    xc, yc, and xc_LCC, yc_LCC can be obtained from domain file.
+    w_nc_var = w_nc_fid.createVariable('lon', np.int32, ('gridcell_dim',))
     w_nc_var.long_name = 'longitude of land gridcells in the NA domain'    
     w_nc_fid.variables['lon'][:] = lon
         
-    w_nc_var = w_nc_fid.createVariable('lat', np.int32, ('x_dim',))
+    w_nc_var = w_nc_fid.createVariable('lat', np.int32, ('gridcell_dim',))
     w_nc_var.long_name = 'latitude of land gridcells in the NA domain'    
     w_nc_fid.variables['lat'][:] = lat
-        
+    """   
     # create the var_name variable
-    w_nc_var = w_nc_fid.createVariable(var_name, np.float32, ('time_dim', 'x_dim'))
+    w_nc_var = w_nc_fid.createVariable(var_name, np.float32, ('time_dim', 'gridcell_dim'))
     w_nc_var.long_name = var_name + 'in the NA domain'    
     w_nc_fid.variables[var_name][:] =data_arr.reshape(i_timesteps,grid_id_arr.size)
         
