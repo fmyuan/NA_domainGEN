@@ -95,24 +95,35 @@ def main():
     args = sys.argv[1:]
 
     if len(sys.argv) != 4  or sys.argv[1] == '--help':  # sys.argv includes the script name as the first argument
-        print("Example use: python AOI_forcingGEN.py <points_file_name> <AOI_domain_name>")
+        print("Example use: python AOI_forcingGEN.py <input_path> <output_path> <AOI_points_file>")
         print(" <input_path>: path to the 1D source data directory")
         print(" <output_path>:  path for the 1D AOI forcing data directory")
-        print(" <points_file_name>:  <AOI>_gridID.csv")
+        print(" <AOI_points_file>:  <AOI>_gridID.csv or <AOI>_domain.nc")      
         exit(0)
 
     input_path = args[0]
     output_path = args[1]
     AOI_gridID_file = args[2]
-    AOI='AKSP'
-    time = 1
+    AOI=AOI_gridID_file.split("_")[0]
 
+    test = 1  # If it is test case 
+    if test == 1:
+        time = 1
+    else
+        time = -1
+
+    if (AOI_gridID_file.endswith(gridID.csv)):
+        #AOI_gridcell_file = AOI+'_gridID.csv'  # user provided gridcell IDs
+        df = pd.read_csv(AOI_gridID_file, sep=",", skiprows=1, names = ['gridID'])
+        #read gridIds
+        AOI_points = np.array(df['gridID'])
+    elif filename.endswith('domain.nc'):
+        src = nc.Dataset(AOI_gridID_file, 'r')
+        AOI_points = src['gridID'][:]
+    else:
+        print("Error: Invalid AOI_points_file, see help.")
+        
     files_nc = get_files(input_path)
-
-    #AOI_gridcell_file = AOI+'_gridID.csv'  # user provided gridcell IDs
-    df = pd.read_csv(AOI_gridID_file, sep=",", skiprows=1, names = ['gridID'])
-    #read gridIds
-    AOI_points = np.array(df['gridID'])
 
     for f in files_nc: 
         var_name = f[23:-11]

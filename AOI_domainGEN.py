@@ -35,17 +35,16 @@ def find_nearest_points(listA, listB):
 def main():
 
     # Check the number of arguments
-    if len(sys.argv) != 4  or sys.argv[1] == '--help':  # sys.argv includes the script name as the first argument
-        print("Example use: python AOIcreation.py <points_file_name> <AOI_domain_name>")
+    if len(sys.argv) != 3  or sys.argv[1] == '--help':  # sys.argv includes the script name as the first argument
+        print("Example use: python AOI_domainGEN.py <points_file_name> <user_option>")
         print(" <points_file_name>:  <domain>_gridID.csv, <domain>_xcyc.csv, <domain>_xcyc_LCC.csv")
-        print(" <user_option>:  1-> gridID, 2-> xcyc, 3-> xcyc_LCC")
-        print(" <AOI_domain>:  Uniqe string for AOI domain name")
+        print(" <user_option>:  1-> gridID, 2-> xcyc(lon,lat), 3-> xcyc_LCC")
         exit(0)
 
     args = sys.argv[1:]
     AOI_gridcell_file = args[0]  # user provided gridcell csv file
     user_option = args[1]
-    AOI = args[2]
+    AOI=AOI_gridID_file.split("_")[0]
 
     # save to the 1D domain file
     AOIdomain = str(AOI)+'domain.nc'
@@ -123,7 +122,7 @@ def main():
         _, domain_idx = tree.query(AOI_points_arr, k=1)
 
     domain_idx = np.sort(domain_idx).squeeze()
-    print("gridID_idx", domain_idx[0:10])
+    print("gridID_idx", domain_idx[0:20])
     #np.savetxt("AOIgridId_idx.csv", domain_idx[0:100], delimiter=",", fmt='%d')
 
     # Copy the global attributes from the source to the target
