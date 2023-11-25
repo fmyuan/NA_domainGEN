@@ -35,16 +35,21 @@ def find_nearest_points(listA, listB):
 def main():
 
     # Check the number of arguments
-    if len(sys.argv) != 3  or sys.argv[1] == '--help':  # sys.argv includes the script name as the first argument
-        print("Example use: python AOI_domainGEN.py <points_file_name> <user_option>")
-        print(" <points_file_name>:  <domain>_gridID.csv, <domain>_xcyc.csv, <domain>_xcyc_LCC.csv")
-        print(" <user_option>:  1-> gridID, 2-> xcyc(lon,lat), 3-> xcyc_LCC")
+    if len(sys.argv) != 2  or sys.argv[1] == '--help':  # sys.argv includes the script name as the first argument
+        print("Example use: python AOI_domainGEN.py <points_file_name>")
+        print(" <points_file_name>:  <AOI_domain>_gridID.csv / <AOI_domain>_xcyc.csv / <AOI_domain>_xcyc_LCC.csv,")
         exit(0)
 
     args = sys.argv[1:]
     AOI_gridcell_file = args[0]  # user provided gridcell csv file
-    user_option = args[1]
-    AOI=AOI_gridID_file.split("_")[0]
+    AOI=AOI_gridcell_file.split("_")[0]
+
+    if AOI_gridcell_file.endswith('gridID.csv'):
+        user_option = 1
+    if AOI_gridcell_file.endswith('xcyc.csv'):
+        user_option = 2
+    if AOI_gridcell_file.endswith('xcyc_LCC.csv'):
+        user_option = 3
 
     # save to the 1D domain file
     AOIdomain = str(AOI)+'domain.nc'
@@ -62,7 +67,7 @@ def main():
     # 3) Open a csv file to read a list of points (y, x)
     #df = read_gridcells(AOI_gridcell_file)  
 
-    if user_option == '1': # gridID is used directly
+    if user_option == 1: # gridID is used directly
         #AOI_gridcell_file = AOI+'_gridID.csv'  # user provided gridcell IDs
         df = pd.read_csv(AOI_gridcell_file, sep=",", skiprows=1, names = ['gridID'])
         #read gridIds
@@ -76,7 +81,7 @@ def main():
 
         domain_idx = np.where(np.in1d(NA_gridcell_list, AOI_points))[0]
 
-    if user_option == '2': # use lat lon coordinates
+    if user_option == 2: # use lat lon coordinates
         #AOI_gridcell_file = AOI+'_xcyc.csv'  # user provided gridcell csv file  (xc, yc) (lon, lat)
         df = pd.read_csv(AOI_gridcell_file, sep=",", skiprows=1, names = ['xc', 'yc'], engine='python')
 
@@ -89,6 +94,19 @@ def main():
         NA_xc = src.variables['xc'][:]
         # create list for all land gridcell (lat, lon)
         NA_gridcell_list = list(zip(NA_xc, NA_yc))
+ 
+        # find the xc, yc boundary
+        NA_xc_max, NA_xc_min = np.max(NA_xc), np.min(NA_xc)
+        NA_yc_max, NA_yc_min = np.max(NA_yc), np.min(NA_yc)
+
+        #check the boundaries
+        for i, pt in enumerate(AOI_points):
+            pt_x, pt_y = pt
+            print (pt_x, NA_xc_min, NA_xc_min.shape)
+            if pt_x > NA_xc_max or pt_x < NA_xc_min or pt_y > NA_yc_max or pt_y < NA_yc_min:
+                AOI_points.remove(pt)
+                print(f"point {i} ({pt_x},{pt_y}) is out of Daymet domain and is removed")
+
 
         AOI_points_arr = np.array(AOI_points)
         print("AOI_points_arr", AOI_points_arr[0:5], "shape", AOI_points_arr.shape)
@@ -98,7 +116,7 @@ def main():
         tree = cKDTree(NA_gridcell_arr)
         _, domain_idx = tree.query(AOI_points_arr, k=1)
 
-    if user_option == '3': # xc_LCC and yc_LCC is used directly
+    if user_option == 3: # xc_LCC and yc_LCC is used directly
         #AOI_gridcell_file = AOI+'_XYLCC.csv'  # user provided gridcell csv file  (xc_LLC, yc_LLC) 
         df = pd.read_csv(AOI_gridcell_file, sep=",", skiprows=1, names = ['xc_LCC', 'yc_LCC'], engine='python')
 
@@ -113,6 +131,19 @@ def main():
         # create list for all land gridcell (lat, lon)
         NA_gridcell_list = list(zip(NA_xc_LCC, NA_yc_LCC))
 
+
+        # find the xc, yc boundary
+        NA_xc_LCC_max, NA_xc_LCC_min = np.max(NA_xc_LCC), np.min(NA_xc_LCC)
+        NA_yc_LCC_max, NA_yc_LCC_min = np.max(NA_yc_LCC), np.min(NA_yc_LCC)
+
+        #check the boundaries
+        for i, pt in enumerate(AOI_points):
+            pt_x, pt_y = pt
+            print (pt_x, NA_xc_LCC_min, NA_xc_LCC_min.shape)
+            if pt_x > NA_xc_LCC_max or pt_x < NA_xc_LCC_min or pt_y > NA_yc_LCC_max or pt_y < NA_yc_LCC_min:
+                AOI_points.remove(pt)
+                print(f"point {i} ({pt_x},{pt_y}) is out of Daymet domain and is removed")
+
         AOI_points_arr = np.array(AOI_points)
         print("AOI_points_arr", AOI_points_arr[0:5], "shape", AOI_points_arr.shape)
         NA_gridcell_arr = np.squeeze(np.array(NA_gridcell_list)).transpose()    
@@ -121,7 +152,8 @@ def main():
         tree = cKDTree(NA_gridcell_arr)
         _, domain_idx = tree.query(AOI_points_arr, k=1)
 
-    domain_idx = np.sort(domain_idx).squeeze()
+    #domain_idx = np.sort(domain_idx).squeeze()
+
     print("gridID_idx", domain_idx[0:20])
     #np.savetxt("AOIgridId_idx.csv", domain_idx[0:100], delimiter=",", fmt='%d')
 
