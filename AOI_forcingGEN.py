@@ -98,7 +98,8 @@ def main():
         print("Example use: python AOI_forcingGEN.py <input_path> <output_path> <AOI_points_file>")
         print(" <input_path>: path to the 1D source data directory")
         print(" <output_path>:  path for the 1D AOI forcing data directory")
-        print(" <AOI_points_file>:  <AOI>_gridID.csv or <AOI>_domain.nc")      
+        print(" <AOI_points_file>:  <AOI>_gridID.csv or <AOI>_domain.nc")
+        print(" The code uses NA forcing to generation 1D AOI forcing")              
         exit(0)
 
     input_path = args[0]

@@ -13,13 +13,6 @@ current_date = datetime.now()
 # Format date to mmddyyyy
 formatted_date = current_date.strftime('%m%d%Y')
 
-# An input csv file that contains the locations of land gridcells in Daymet domain;
-# 1:  land gridcell ID
-# 2:  xc, yc (lon, lat) of land gridcell center 
-# 3:  xc_LCC,yc_LCC (x,y) location in LLC projection
-
-# output 1D AOIdomain.nc that can be used to generate 1D AOIsurfdata.nc and 1D AOIforcing.nc 
-
 def read_gridcells(file_name):
     try:
         df = pd.read_csv(file_name, sep=",")
