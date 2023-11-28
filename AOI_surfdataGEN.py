@@ -13,20 +13,8 @@ current_date = datetime.now()
 # Format date to mmddyyyy
 formatted_date = current_date.strftime('%m%d%Y')
 
-def read_gridcells(file_name):
-    try:
-        df = pd.read_csv(file_name, sep=",")
-    except pd.errors.ParserError:
-        df = pd.read_csv(file_name, sep=" ")
-    return df
-
-def find_nearest_points(listA, listB):
-    tree = cKDTree(np.array(listB))
-    _, indices = tree.query(listA, k=1)
-    return indices
-
 def main():
-
+    args = sys.argv[1:]
     # Check the number of arguments
     if len(sys.argv) != 4  or sys.argv[1] == '--help':  # sys.argv includes the script name as the first argument
         print("Example use: python AOI_surfdataGEN.py <input_path> <output_path> <AOI_points_file>")
@@ -41,12 +29,12 @@ def main():
     AOI_gridID_file = args[2]
     AOI=AOI_gridID_file.split("_")[0]
 
-    if (AOI_gridID_file.endswith(gridID.csv)):
+    if (AOI_gridID_file.endswith('gridID.csv')):
         #AOI_gridcell_file = AOI+'_gridID.csv'  # user provided gridcell IDs
         df = pd.read_csv(AOI_gridID_file, sep=",", skiprows=1, names = ['gridID'])
         #read gridIds
         AOI_points = np.array(df['gridID'])
-    elif filename.endswith('domain.nc'):
+    elif AOI_gridID_file.endswith('domain.nc'):
         src = nc.Dataset(AOI_gridID_file, 'r')
         AOI_points = src['gridID'][:]
     else:
@@ -59,7 +47,7 @@ def main():
     if os.path.exists(AOIsurfdata):
         os.remove(AOIsurfdata)
 
-    source_file = 'Daymet4.1km.1d.surfdata.nc'
+    source_file = 'Daymet4.1km.1d.surfdata_v1_part1.nc'
     dst = nc.Dataset(AOIsurfdata, 'w', format='NETCDF4')
 
     # open the 1D domain data
@@ -88,21 +76,41 @@ def main():
         else:
             # Update the 'ni' dimension with the length of the list
             #dst.dimensions['ni'].set_length(len(AOI_points))
-            ni = dst.createDimension("gridcell", len(AOI_points))
+            ni = dst.createDimension('gridcell', AOI_points.size)
 
     # Copy the variables from the source to the target
     for name, variable in src.variables.items():
-        x = dst.createVariable(name, variable.datatype, variable.dimensions)   
-        print(name, variable.dimensions)
-        
-        if (variable.dimensions[-1] != 'gridcell'):
+
+        if (len(variable.dimensions) == 0 or variable.dimensions[-1] != 'gridcell'):
+            x = dst.createVariable(name, variable.datatype, variable.dimensions)   
+            print(name, variable.dimensions)
+            # Copy variable attributes
+            dst[name].setncatts(src[name].__dict__)
+            # Copy the data
             dst[name][:] = src[name][:]
+
         else:
-            dst[name][:] = src[name][0][domain_idx]
-           
-        # Copy the variable attributes
-        for attr_name in variable.ncattrs():
-            dst[name].setncattr(attr_name, variable.getncattr(attr_name))
+            if len(variable.dimensions) == 1:
+                x = dst.createVariable(name, variable.datatype, ('gridcell',))   
+                print(name, dst[name].dimensions)           
+                dst[name][:] = src[name][domain_idx]
+            if len(variable.dimensions) == 2:
+                x = dst.createVariable(name, variable.datatype, variable.dimensions[:-1]+('gridcell',))   
+                print(name, dst[name].dimensions)               
+                for index in range(variable.shape[0]):
+                    # get all the source data (global)
+                    dst[name][index,:] = src[name][index][domain_idx]
+            if len(variable.dimensions) == 3:
+                x = dst.createVariable(name, variable.datatype, variable.dimensions[:-1]+('gridcell',))   
+                print(name, dst[name].dimensions)   
+                for index1 in range(variable.shape[0]):
+                    for index2 in range(variable.shape[1]):
+                        # get all the source data (global)
+                        dst[name][index1,index2,:] = src[name][index1][index2][domain_idx]
+            # Copy variable attributes (except _FillValue)
+            attrs = dict(src[name].__dict__)
+            attrs.pop('_FillValue', None)
+            dst[name].setncatts(attrs)
 
     dst.title = '1D surfdata for '+ AOI +', generated on ' +formatted_date + ' with ' + source_file
        
