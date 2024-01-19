@@ -1,6 +1,6 @@
 
-# data_partition module for batch processing
-# based on array_split and function definition
+# utility to generate 1D and 2D domain
+# use previous dataPartition module. Code need to be clean up
 
 import os 
 import netCDF4 as nc
@@ -157,25 +157,27 @@ def data_save_1dNA(output_path, grid_ids, i_timesteps, var_name, period, data, l
     # Open a new NetCDF file to write the data to. For format, you can choose from
     # 'NETCDF3_CLASSIC', 'NETCDF3_64BIT', 'NETCDF4_CLASSIC', and 'NETCDF4'
     w_nc_fid = nc.Dataset(file_name, 'w', format='NETCDF4')
-    w_nc_fid.title = 'forcing : '+ var_name + 'in the NA domain'
+    w_nc_fid.title = var_name + '('+period+') in the NA domain'
 
     # create the gridIDs, lon, and lat variable
-    x_dim = w_nc_fid.createDimension('x_dim', grid_id_arr.size)
+    gridcell_dim = w_nc_fid.createDimension('gridcell', grid_id_arr.size)
     time_dim = w_nc_fid.createDimension('time_dim', i_timesteps)
-    w_nc_var = w_nc_fid.createVariable('gridIDs', np.int32, ('x_dim',))
-    w_nc_var.long_name = 'gridIds in the NA domain'    
-    w_nc_fid.variables['gridIDs'][:] = grid_id_arr.reshape(grid_id_arr.size)
-
-    w_nc_var = w_nc_fid.createVariable('lon', np.int32, ('x_dim',))
+    w_nc_var = w_nc_fid.createVariable('gridID', np.int32, ('gridcell_dim',))
+    w_nc_var.long_name = 'gridId in the NA domain'    
+    w_nc_fid.variables['gridID'][:] = grid_id_arr.reshape(grid_id_arr.size)
+    
+    """ 
+    xc, yc, and xc_LCC, yc_LCC can be obtained from domain file.
+    w_nc_var = w_nc_fid.createVariable('lon', np.int32, ('gridcell_dim',))
     w_nc_var.long_name = 'longitude of land gridcells in the NA domain'    
     w_nc_fid.variables['lon'][:] = lon
         
-    w_nc_var = w_nc_fid.createVariable('lat', np.int32, ('x_dim',))
+    w_nc_var = w_nc_fid.createVariable('lat', np.int32, ('gridcell_dim',))
     w_nc_var.long_name = 'latitude of land gridcells in the NA domain'    
     w_nc_fid.variables['lat'][:] = lat
-        
+    """   
     # create the var_name variable
-    w_nc_var = w_nc_fid.createVariable(var_name, np.float32, ('time_dim', 'x_dim'))
+    w_nc_var = w_nc_fid.createVariable(var_name, np.float32, ('time_dim', 'gridcell_dim'))
     w_nc_var.long_name = var_name + 'in the NA domain'    
     w_nc_fid.variables[var_name][:] =data_arr.reshape(i_timesteps,grid_id_arr.size)
         
@@ -206,10 +208,10 @@ def domain_save_1dNA(output_path, grid_ids, data, lon, lat, XC, YC):
     x_dim = w_nc_fid.createDimension('x_dim', 7814)
     y_dim = w_nc_fid.createDimension('y_dim', 8075)   
 
-    w_nc_var = w_nc_fid.createVariable('gridIDs', np.int32, ('nj','ni'))
-    w_nc_var.long_name = 'gridIds in the NA domain'
+    w_nc_var = w_nc_fid.createVariable('gridID', np.int32, ('nj','ni'))
+    w_nc_var.long_name = 'gridId in the NA domain'
     w_nc_var.decription = "start from #0 at the upper left corner of the domain, covering all land and ocean gridcells" 
-    w_nc_fid.variables['gridIDs'][:] = grid_id_arr.reshape(grid_id_arr.size)
+    w_nc_fid.variables['gridID'][:] = grid_id_arr.reshape(grid_id_arr.size)
 
     w_nc_var = w_nc_fid.createVariable('xc', np.float32, ('nj','ni'))
     w_nc_var.long_name = 'longitude of land gridcell center (GCS_WGS_84), increasing from west to east'
@@ -223,16 +225,16 @@ def domain_save_1dNA(output_path, grid_ids, data, lon, lat, XC, YC):
     w_nc_fid.variables['yc'][:] = lat
         
     # create the XC, YC variable
-    w_nc_var = w_nc_fid.createVariable('xc_LLC', np.float32, ('nj','ni'))
+    w_nc_var = w_nc_fid.createVariable('xc_LCC', np.float32, ('nj','ni'))
     w_nc_var.long_name = 'X of land gridcell center (Lambert Conformal Conic), increasing from west to east'
     w_nc_var.units = "m"
     #w_nc_var.bounds = "xv" ;    
-    w_nc_fid.variables['xc_LLC'][:] = XC
+    w_nc_fid.variables['xc_LCC'][:] = XC
         
-    w_nc_var = w_nc_fid.createVariable('yc_LLC', np.float32, ('nj','ni'))
+    w_nc_var = w_nc_fid.createVariable('yc_LCC', np.float32, ('nj','ni'))
     w_nc_var.long_name = 'Y of land gridcell center (Lambert Conformal Conic), decreasing from north to south'
     w_nc_var.units = "m"        
-    w_nc_fid.variables['yc_LLC'][:] = YC
+    w_nc_fid.variables['yc_LCC'][:] = YC
 
     w_nc_var = w_nc_fid.createVariable('area', np.float32, ('nj','ni'))
     w_nc_var.long_name = 'Area of land gridcells (Lambert Conformal Conic)'
@@ -288,10 +290,10 @@ def domain_save_2dNA(output_path, total_rows, total_cols, data, lon, lat, XC, YC
     x_dim = w_nc_fid.createDimension('x_dim', 7814)
     y_dim = w_nc_fid.createDimension('y_dim', 8075)   
 
-    w_nc_var = w_nc_fid.createVariable('gridIDs', np.int32, ('y_dim','x_dim'))
-    w_nc_var.long_name = 'gridIds in the NA domain'
+    w_nc_var = w_nc_fid.createVariable('gridID', np.int32, ('y_dim','x_dim'))
+    w_nc_var.long_name = 'gridId in the NA domain'
     w_nc_var.decription = "start from #0 at the upper left corner of the domain, covering all land and ocean gridcells" 
-    w_nc_fid.variables['gridIDs'][:] = grid_ids 
+    w_nc_fid.variables['gridID'][:] = grid_ids 
 
     w_nc_var = w_nc_fid.createVariable('xc', np.float32, ('y_dim','x_dim'))
     w_nc_var.long_name = 'longitude of land gridcell center (GCS_WGS_84), increasing from west to east'
@@ -305,16 +307,16 @@ def domain_save_2dNA(output_path, total_rows, total_cols, data, lon, lat, XC, YC
     w_nc_fid.variables['yc'][:] = lat
         
     # create the XC, YC variable
-    w_nc_var = w_nc_fid.createVariable('xc_LLC', np.float32, ('y_dim','x_dim'))
+    w_nc_var = w_nc_fid.createVariable('xc_LCC', np.float32, ('y_dim','x_dim'))
     w_nc_var.long_name = 'X of land gridcell center (Lambert Conformal Conic), increasing from west to east'
     w_nc_var.units = "m"
     #w_nc_var.bounds = "xv" ;    
-    w_nc_fid.variables['xc_LLC'][:] = XC
+    w_nc_fid.variables['xc_LCC'][:] = XC
         
-    w_nc_var = w_nc_fid.createVariable('yc_LLC', np.float32, ('y_dim','x_dim'))
+    w_nc_var = w_nc_fid.createVariable('yc_LCC', np.float32, ('y_dim','x_dim'))
     w_nc_var.long_name = 'Y of land gridcell center (Lambert Conformal Conic), decreasing from north to south'
     w_nc_var.units = "m"        
-    w_nc_fid.variables['yc_LLC'][:] = YC
+    w_nc_fid.variables['yc_LCC'][:] = YC
 
     w_nc_var = w_nc_fid.createVariable('area', np.float32, ('y_dim','x_dim'))
     w_nc_var.long_name = 'Area of land gridcells (Lambert Conformal Conic)'
