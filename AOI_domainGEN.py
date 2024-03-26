@@ -45,7 +45,9 @@ def main():
         exit(0)
 
     input_path = args[0]
+    if not input_path.endswith("/"): input_path=input_path+'/'
     output_path = args[1]
+    if not output_path.endswith("/"): output_path=output_path+'/'
     AOI_gridcell_file = args[2]
     AOI=AOI_gridcell_file.split("_")[0]
 
@@ -57,13 +59,14 @@ def main():
         user_option = 3
 
     # save to the 1D domain file
-    AOIdomain = str(AOI)+'_domain.lnd.Daymet4.1km.1d.c231120.nc'
-
+    AOIdomain = output_path+AOI+'/domain.lnd.Daymet4.1km.1d.c231120.nc'
     # check if file exists then delete it
-    if os.path.exists(AOIdomain):
+    if not os.path.exists(output_path+AOI): 
+        os.makedirs(output_path+AOI)
+    elif os.path.exists(AOIdomain):
         os.remove(AOIdomain)
 
-    source_file = 'domain.lnd.Daymet4.1km.1d.c231120.nc'
+    source_file = input_path+'domain.lnd.Daymet4.1km.1d.c231120.nc'
     dst = nc.Dataset(AOIdomain, 'w', format='NETCDF4')
 
     # open the 1D domain data

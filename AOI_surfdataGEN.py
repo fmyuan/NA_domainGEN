@@ -43,10 +43,11 @@ def main():
         print("Error: Invalid AOI_points_file, see help.")
 
     # save to the 1D domain file
-    AOIsurfdata = output_path+str(AOI)+'_surfdata_Daymet4.1km.1d.v1.nc'
-
-    # check if file exists then delete it
-    if os.path.exists(AOIsurfdata):
+    AOIsurfdata = output_path+str(AOI)+'/surfdata_Daymet4.1km.1d.v1.nc'
+     # check if file exists then delete it
+    if not os.path.exists(output_path+AOI): 
+        os.makedirs(output_path+AOI)
+    elif os.path.exists(AOIsurfdata):
         os.remove(AOIsurfdata)
 
     source_file = input_path+'surfdata_Daymet4.1km.1d.v1.nc'
