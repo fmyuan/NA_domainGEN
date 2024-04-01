@@ -3,11 +3,19 @@
 # based on array_split and function definition
 
 import os,sys
+import glob
+import math
 import netCDF4 as nc
 import numpy as np
 import pandas as pd
 from time import process_time
 from datetime import datetime
+
+try:
+    from mpi4py import MPI
+    HAS_MPI4PY=True
+except ImportError:
+    HAS_MPI4PY=False
 
 # Get current date
 current_date = datetime.now()
@@ -72,17 +80,17 @@ def AOI_forcing_save_1d(input_path, file, AOI, AOI_points, output_path):
     src.close()  # close the source file 
     dst.close()  # close the new file        
     
-def get_files(input_path):
+def get_files(input_path, ncheader='clmforc'):
     print(input_path)
-    files = os.listdir(input_path) 
-
+    #files = os.listdir(input_path)
+    files = glob.glob("%s*.%s" % (input_path+ncheader,'nc'))
+    
     files.sort() 
 
-    file_no =0
+    #files_nc = [f for f in files if (f[-2:] == 'nc')] 
+    print("total " + str(len(files)) + " files need to be processed")
 
-    files_nc = [f for f in files if (f[-2:] == 'nc')] 
-    print("total " + str(len(files_nc)) + " files need to be processed")
-    return files_nc
+    return files
 
 def main():
     args = sys.argv[1:]
@@ -114,12 +122,35 @@ def main():
         print("Error: Invalid AOI_points_file, see help.")
         
     files_nc = get_files(input_path)
+    n_files = len(files_nc)
+    #
+#------------------------------------------------------------------------------------------
+# mpi implementation - simply round-robin 'n_files' over cpu_cores
+    if HAS_MPI4PY:
+        mycomm = MPI.COMM_WORLD
+        myrank = mycomm.Get_rank()
+        mysize = mycomm.Get_size()
+    else:
+        mycomm = 0
+        myrank = 0
+        mysize = 1
 
-    for f in files_nc: 
-        if (not f.startswith('clmforc')): continue
+    ng = math.floor(n_files/mysize)
+    ng_rank = np.full([mysize], int(1))
+    ng_rank = np.cumsum(ng_rank)*ng
+    xg = int(math.fmod(n_files, mysize))
+    xg_rank = np.full([mysize], int(0))
+    if xg>0: xg_rank[:xg]=1
+    ng_rank = ng_rank + np.cumsum(xg_rank) - 1        # ending file index, starting 0, for each rank
+    ng0_rank = np.hstack((0, ng_rank[0:mysize-1]+1))  # starting file index, starting 0, for each rank
+
+    for i in range(ng0_rank[myrank], ng_rank[myrank]+1):
+        f = files_nc[i]
+
+        if (not f.split('/')[-1].startswith('clmforc')): continue
         print('processing '+ f )
         start = process_time() 
-        AOI_forcing_save_1d(input_path, f, AOI, AOI_points, output_path)
+        AOI_forcing_save_1d(input_path, f.split('/')[-1], AOI, AOI_points, output_path)
         end = process_time()
         print("Generating 1D forcing data for "+AOI+ " domain takes {}".format(end-start))
 

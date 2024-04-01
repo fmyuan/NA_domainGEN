@@ -582,9 +582,13 @@ def main():
     i_timesteps = int(arg[3])
     """
     
-    input_path= './'
+    args = sys.argv[1:]
+
+    input_path = args[0]
+    if not input_path.endswith("/"): input_path=input_path+'/'
+    output_path = args[1]
+    if not output_path.endswith("/"): output_path=output_path+'/'
     file_name = 'clmforc.Daymet4.1km.TBOT.2014-01.nc'
-    output_path = input_path
     number_of_subdomains = 1
     i_timesteps = 1
     var_name = 'TBOT'
